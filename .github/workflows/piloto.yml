@@ -57,7 +57,7 @@ permissions:
 jobs:
   # Con el secreto de SOLO LECTURA del repo privado, que vive en el environment
   # `verificacion` (sin revisores; solo la rama por defecto de este repo). El
-  # token se llama en GitHub «Descargas lee candidatos de 6Keys».
+  # token se llama en GitHub «6Keys downloads (read-only)».
   verificar:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -78,7 +78,7 @@ jobs:
       - name: Verificar el candidato en el repo privado
         id: verificar
         env:
-          GH_TOKEN: ${{ secrets.DESCARGAS_LEE_CANDIDATOS_6KEYS }}
+          GH_TOKEN: ${{ secrets.DOWNLOADS_6KEYS_READ_ONLY }}
           VERSION: ${{ inputs.version }}
           RUN_ID: ${{ inputs.run_id }}
           # En modo verificar, el script mira qué paquete trae el run.
@@ -86,7 +86,7 @@ jobs:
           SALIDA: ${{ runner.temp }}/verificado
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::Falta el secreto DESCARGAS_LEE_CANDIDATOS_6KEYS en el environment «verificacion». Cómo crearlo: docs/15 del repo privado, «Configuración de GitHub»."
+            echo "::error::Falta el secreto DOWNLOADS_6KEYS_READ_ONLY en el environment «verificacion». Cómo crearlo: docs/15 del repo privado, «Configuración de GitHub»."
             exit 1
           fi
           node entrega/verificar.mjs

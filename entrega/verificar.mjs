@@ -4,7 +4,7 @@
 // es, byte a byte, el que el candidato dejó. Solo lee: ni publica ni modifica nada.
 //
 // Lo ejecuta el job `verificar` de `piloto.yml` con el secreto
-// DESCARGAS_LEE_CANDIDATOS_6KEYS: el token «Descargas lee candidatos de 6Keys»,
+// DOWNLOADS_6KEYS_READ_ONLY: el token «6Keys downloads (read-only)»,
 // de solo lectura (Actions y Contents del repo privado, nada más).
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
