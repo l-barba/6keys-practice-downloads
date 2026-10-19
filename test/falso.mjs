@@ -92,7 +92,11 @@ export function origen({ version = "0.5.0", ensayo = false, carpetaPaquete, mani
     }
     throw new Error(`Listado no esperado: ${ruta} (${clave})`);
   };
-  const descargar = async (ruta, destino) => { writeFileSync(destino, estado.zip); };
+  const descargar = async (ruta, destino, accept) => {
+    // Como GitHub: el zip de un artefacto no admite octet-stream (HTTP 415).
+    if (accept === "application/octet-stream" || accept === undefined) throw new Error("gh: Unsupported 'Accept' header (HTTP 415)");
+    writeFileSync(destino, estado.zip);
+  };
   const extraer = async (zip, carpeta) => { cpSync(carpetaPaquete, carpeta, { recursive: true }); };
   return { estado, api, todas, descargar, extraer };
 }

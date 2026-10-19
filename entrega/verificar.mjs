@@ -94,7 +94,10 @@ export async function verificarCandidato({ destino, version, runId, ensayo, dir,
   }
   mkdirSync(dir, { recursive: true });
   const zip = join(dir, "paquete.zip");
-  await descargar(`repos/${ORIGEN}/actions/artifacts/${artefacto.id}/zip`, zip);
+  // El zip de un artefacto se pide con el Accept normal de la API (redirige al
+  // fichero); `application/octet-stream` da 415 aquí y solo vale para los assets
+  // de una release. Visto contra un run real el 2026-10-19.
+  await descargar(`repos/${ORIGEN}/actions/artifacts/${artefacto.id}/zip`, zip, "application/vnd.github+json");
   exigir(`sha256:${await sha256DeFichero(zip)}` === artefacto.digest, "El zip descargado no coincide con el digest del artefacto.");
   const carpeta = join(dir, "paquete");
   await extraer(zip, carpeta);
