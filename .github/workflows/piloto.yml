@@ -7,7 +7,9 @@
 #     -f version=X.Y.Z -f run_id=<run del candidato> -f modo=publicar
 #
 # Tres modos:
-#   · verificar — solo comprueba el candidato. Sin aprobación ni escritura.
+#   · verificar — solo comprueba el candidato (nominado o de ensayo). Sin
+#                 aprobación ni escritura: sirve también para comprobar que el
+#                 secreto de lectura funciona.
 #   · ensayo    — para un candidato de ensayo (`candidato.yml` con nominar=false):
 #                 verifica, crea un borrador bajo `ensayo-<run>`, lo sube, lo
 #                 comprueba y lo BORRA. Pide la aprobación igual que publicar.
@@ -53,8 +55,9 @@ permissions:
   contents: read
 
 jobs:
-  # Con el secreto de lectura del repo privado, que vive en el environment
-  # `verificacion` (sin revisores; solo la rama por defecto de este repo).
+  # Con el secreto de SOLO LECTURA del repo privado, que vive en el environment
+  # `verificacion` (sin revisores; solo la rama por defecto de este repo). El
+  # token se llama en GitHub «Descargas lee candidatos de 6Keys».
   verificar:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -75,14 +78,15 @@ jobs:
       - name: Verificar el candidato en el repo privado
         id: verificar
         env:
-          GH_TOKEN: ${{ secrets.LECTURA_6KEYS }}
+          GH_TOKEN: ${{ secrets.DESCARGAS_LEE_CANDIDATOS_6KEYS }}
           VERSION: ${{ inputs.version }}
           RUN_ID: ${{ inputs.run_id }}
-          ENSAYO: ${{ inputs.modo == 'ensayo' }}
+          # En modo verificar, el script mira qué paquete trae el run.
+          ENSAYO: ${{ inputs.modo == 'ensayo' && 'true' || inputs.modo == 'publicar' && 'false' || 'auto' }}
           SALIDA: ${{ runner.temp }}/verificado
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::Falta el secreto LECTURA_6KEYS en el environment «verificacion» (docs/15 del repo privado)."
+            echo "::error::Falta el secreto DESCARGAS_LEE_CANDIDATOS_6KEYS en el environment «verificacion». Cómo crearlo: docs/15 del repo privado, «Configuración de GitHub»."
             exit 1
           fi
           node entrega/verificar.mjs

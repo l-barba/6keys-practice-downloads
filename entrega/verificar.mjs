@@ -3,8 +3,9 @@
 // el tag anotado señala ese commit y ancla el paquete; y que el paquete descargado
 // es, byte a byte, el que el candidato dejó. Solo lee: ni publica ni modifica nada.
 //
-// Lo ejecuta el job `verificar` de `piloto.yml` con el secreto LECTURA_6KEYS
-// (lectura de Actions y Contents del repo privado, nada más).
+// Lo ejecuta el job `verificar` de `piloto.yml` con el secreto
+// DESCARGAS_LEE_CANDIDATOS_6KEYS: el token «Descargas lee candidatos de 6Keys»,
+// de solo lectura (Actions y Contents del repo privado, nada más).
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -161,9 +162,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const { conexion } = await import("./gh.mjs");
   const { api, todas, descargar } = conexion(process.env.GH_TOKEN);
   const salida = resolve(process.env.SALIDA ?? "verificado");
+  // «auto» (modo verificar): el run dice si trae un paquete de ensayo o nominado.
+  let ensayo = process.env.ENSAYO === "true";
+  if (process.env.ENSAYO === "auto") {
+    const runId = Number(process.env.RUN_ID);
+    ensayo = (await todas(`repos/${ORIGEN}/actions/runs/${runId}/artifacts?name=${encodeURIComponent(`entrega-ensayo-${runId}`)}`, "artifacts")).length > 0;
+    console.log(`Modo verificar: el run ${runId} trae un paquete ${ensayo ? "de ensayo" : "nominado"}.`);
+  }
   const r = await verificarCandidato({
     destino: process.env.GITHUB_REPOSITORY, version: process.env.VERSION, runId: Number(process.env.RUN_ID),
-    ensayo: process.env.ENSAYO === "true", dir: salida, api, todas, descargar,
+    ensayo, dir: salida, api, todas, descargar,
     // `unzip` viene en los runners de Ubuntu y se niega a escribir fuera de la carpeta.
     extraer: async (zip, carpeta) => { execFileSync("unzip", ["-q", "-o", zip, "-d", carpeta], { stdio: "inherit" }); }
   });
