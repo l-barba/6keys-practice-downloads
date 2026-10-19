@@ -14,7 +14,8 @@ async function preparar(t, { ensayo = false, releases, latest } = {}) {
   const p = paquete(dir, { ensayo });
   const verificado = {
     version: "0.5.0", tag: p.tag, manifiestoSha256: p.manifiestoSha256,
-    procedencia: { repositorio: "l-barba/6keys-practice", run_id: RUN, run_attempt: 1, rama: "release/0.5", sha: SHA, arbol: ARBOL, manifiesto_sha256: p.manifiestoSha256 }
+    procedencia: { repositorio: "l-barba/6keys-practice", run_id: RUN, run_attempt: 1, paquete_attempt: 1, rama: "release/0.5", sha: SHA, arbol: ARBOL,
+      artefacto_id: 77, artefacto_digest: `sha256:${"9".repeat(64)}`, manifiesto_sha256: p.manifiestoSha256 }
   };
   const d = descargas({ releases, latest });
   const publicar = (extra = {}) => publicarPiloto({ destino: DESTINO, carpeta: dir, verificado, ensayo, ahora: LUNES, ...d, ...extra });
@@ -111,7 +112,8 @@ test("un reintento después de publicar completa lo pendiente sin volver a publi
   const base = await preparar(t, { releases: [v041, anterior], latest: "v0.4.1" });
   const ya = releaseDesdePaquete(base.dir, base.p.manifiesto, { id: 7, tag_name: "v0.5.0", body: `piloto\n${marcaDeProcedencia(base.verificado.procedencia)}` });
   base.d.estado.releases.push(ya);
-  const r = await base.publicar();
+  // Repetir solo el job «candidato» cambia el intento del run, no el paquete.
+  const r = await base.publicar({ verificado: { ...base.verificado, procedencia: { ...base.verificado.procedencia, run_attempt: 2 } } });
   assert.equal(r.reanudada, true);
   assert.ok(!base.d.estado.llamadas.some(([m, , c]) => m === "POST" || (m === "PATCH" && c?.draft === false)), "ni borrador nuevo ni segunda publicación");
   assert.deepEqual(leerSustituida(base.d.estado.releases.find(x => x.tag_name === "v0.4.2").body), { por: "v0.5.0" });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  comprobarFicheros, comprobarYml, leerYml, compararVersiones, diasEntre, esViernes, ficherosDeLaVersion, leerAnclaDelTag,
+  comprobarFicheros, comprobarYml, leerYml, mismaProcedencia, compararVersiones, diasEntre, esViernes, ficherosDeLaVersion, leerAnclaDelTag,
   leerProcedencia, marcaDeProcedencia, noEnViernes, tagDelPaquete, versionEstable
 } from "../entrega/reglas.mjs";
 
@@ -65,7 +65,11 @@ test("yml del actualizador: solo su versión, su tag, su arquitectura y nada que
     [ok041, yml041.replace("releaseDate", "stagingPercentage: 100\nreleaseDate"), /Clave desconocida/],
     [ok041, yml041.replace("files:", "files:\n\t"), /tabuladores/],
     [ok041, "version: 0.4.1\nfiles:\n  - url: 6Keys-Practice-0.4.1-x64.exe\n    sha512: x\n    size: 1\n", /fuera de lo permitido/],
-    [ok041, yml041.replace(/^sha512: >-\n.*$/m, "sha512: >-\n  AAAA"), /«path» y «sha512»/]
+    [ok041, yml041.replace(/^sha512: >-\n.*$/m, "sha512: >-\n  AAAA"), /«path» y «sha512»/],
+    // La segunda lectura de Codex: dos `files:` (js-yaml lo rechaza) y comillas anidadas (js-yaml conserva las dobles).
+    [ok041, yml041.replace("path: >-", "files:\n  - url: https://github.com/l-barba/6keys-practice-downloads/releases/download/v0.4.1/6Keys-Practice-0.4.1-x64.exe\npath: >-"), /Clave repetida: files/],
+    [ok041, yml041.replace(/(      )(https:\S+x64\.exe)/, `$1'"$2"'`), /Comillas inesperadas/],
+    [ok041, yml041.replace("path: >-", "  - url: >-\n      https://x\npath: >-").replace(/^releaseDate.*$/m, "releaseDate: '2026'\n  - url: https://x"), /Entrada de «files» inesperada/]
   ];
   for (const [opciones, texto, error] of malos) assert.throws(() => comprobarYml(texto, opciones), error);
 });
@@ -83,6 +87,15 @@ test("días entre fechas", () => {
   assert.equal(diasEntre("2026-10-20", "2026-10-27"), 7);
   assert.equal(diasEntre("2026-10-27", "2026-10-20"), -7);
   assert.throws(() => diasEntre("20/10/2026", "2026-10-27"), /AAAA-MM-DD/);
+});
+
+test("la identidad del paquete no depende del intento del último job", () => {
+  const p = { repositorio: "r", run_id: 1, rama: "release/0.5", sha: "a", arbol: "b", paquete_attempt: 1, artefacto_id: 2, artefacto_digest: "c", manifiesto_sha256: "d", run_attempt: 1 };
+  assert.equal(mismaProcedencia(p, { ...p, run_attempt: 2 }), true);
+  for (const k of ["run_id", "sha", "arbol", "paquete_attempt", "artefacto_id", "artefacto_digest", "manifiesto_sha256"]) {
+    assert.equal(mismaProcedencia(p, { ...p, [k]: "otro" }), false, k);
+  }
+  assert.equal(mismaProcedencia(p, null), false);
 });
 
 test("marcas en el cuerpo y ancla del tag", () => {

@@ -45,8 +45,7 @@ export async function verificarCandidato({ destino, version, runId, ensayo, dir,
   }
   const jobs = [...ultima.values()];
   for (const nombre of JOBS_DEL_CANDIDATO) {
-    const casan = jobs.filter(j => nombre.endsWith(" ") ? j.name.startsWith(nombre) : j.name === nombre);
-    exigir(casan.length > 0, `Falta el job «${nombre.trim()}» en el run ${runId}: el ensayo no está completo.`);
+    exigir(ultima.has(nombre), `Falta el job «${nombre}» en el run ${runId}: el ensayo no está completo.`);
   }
   const noVerdes = jobs.filter(j => j.conclusion !== "success");
   exigir(noVerdes.length === 0, `Jobs que no están en verde en su última ejecución: ${noVerdes.map(j => `${j.name} (${j.conclusion})`).join(", ")}`);
@@ -134,7 +133,8 @@ export async function verificarCandidato({ destino, version, runId, ensayo, dir,
     procedencia: {
       repositorio: ORIGEN, run_id: runId, run_attempt: run.run_attempt, paquete_attempt: p.run_attempt,
       rama: run.head_branch, sha: run.head_sha, arbol: commit.tree.sha,
-      artefacto_id: artefacto.id, artefacto_digest: artefacto.digest, manifiesto_sha256: manifiestoSha256
+      artefacto_id: artefacto.id, artefacto_digest: artefacto.digest, manifiesto_sha256: manifiestoSha256,
+      ...(p.instalada ? { instalada: p.instalada } : {})
     }
   };
 }
@@ -148,6 +148,7 @@ export function resumen(r) {
     `| Commit | \`${p.sha}\` (${p.rama}) |`,
     `| Árbol | \`${p.arbol}\` |`,
     `| Run del candidato | ${p.run_id}, intento ${p.run_attempt} (paquete del intento ${p.paquete_attempt}) |`,
+    `| Actualización ensayada | desde v${p.instalada ?? "?"} |`,
     `| Artefacto | ${p.artefacto_id}, \`${p.artefacto_digest}\` |`,
     `| release-manifest.json | \`sha256:${p.manifiesto_sha256}\` |`, ""
   ].join("\n");

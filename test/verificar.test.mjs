@@ -48,7 +48,7 @@ const casos = [
   ["run en rojo", { cambios: e => { e.run.conclusion = "failure"; } }, /no terminó en verde/],
   ["rama que no es la de su release", { cambios: e => { e.run.head_branch = "main"; } }, /release\/0.5/],
   ["falta una plataforma", { cambios: e => { e.jobs = e.jobs.filter(j => j.name !== "macOS Intel (x64)"); } }, /Falta el job «macOS Intel/],
-  ["falta el ensayo de actualización", { cambios: e => { e.jobs = e.jobs.filter(j => !j.name.startsWith("actualizar")); } }, /Falta el job «actualizar Windows desde»/],
+  ["falta el ensayo de actualización", { cambios: e => { e.jobs = e.jobs.filter(j => !j.name.startsWith("actualizar")); } }, /Falta el job «actualizar Windows»/],
   ["un job saltado", { cambios: e => { e.jobs[1].conclusion = "skipped"; } }, /no están en verde/],
   ["package.json con otra versión", { cambios: e => { e.version = "0.4.9"; } }, /dice 0.4.9/],
   ["commit fuera de la rama", { cambios: e => { e.compare = "diverged"; } }, /no está en release\/0.5/],
@@ -99,7 +99,7 @@ test("un «Re-run failed jobs» completo se acepta: cada job cuenta por su últi
     e.jobs = e.jobs.map(j => ["Windows (x64)", "paquete", "candidato"].includes(j.name) || j.name.startsWith("actualizar")
       ? { ...j, conclusion: j.name === "Windows (x64)" ? "failure" : "skipped" } : j);
     // Intento 2: solo se repiten esos; los Mac siguen siendo los del intento 1.
-    for (const n of ["Windows (x64)", "actualizar Windows desde v0.4.1", "paquete", "candidato"]) e.jobs.push({ name: n, conclusion: "success", run_attempt: 2 });
+    for (const n of ["Windows (x64)", "actualizar Windows", "paquete", "candidato"]) e.jobs.push({ name: n, conclusion: "success", run_attempt: 2 });
     e.run.run_attempt = 2;
   }, estropear: c => {
     const m = JSON.parse(readFileSync(join(c, "release-manifest.json"), "utf8"));

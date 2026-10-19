@@ -43,7 +43,7 @@ export function paquete(dir, { version = "0.5.0", ensayo = false, runId = RUN, s
   files.sort((a, b) => a.name.localeCompare(b.name));
   const manifiesto = {
     schema: 2, tag, version, ensayo, commit: sha,
-    procedencia: { repositorio: ORIGEN, workflow: WORKFLOW_CANDIDATO, run_id: runId, run_attempt: attempt, rama, arbol: ARBOL },
+    procedencia: { repositorio: ORIGEN, workflow: WORKFLOW_CANDIDATO, run_id: runId, run_attempt: attempt, rama, arbol: ARBOL, instalada: "0.4.1" },
     files
   };
   const bytes = JSON.stringify(manifiesto, null, 2) + "\n";
@@ -61,7 +61,7 @@ export function origen({ version = "0.5.0", ensayo = false, carpetaPaquete, mani
       head_branch: ensayo ? "main" : "release/0.5", head_sha: SHA, run_attempt: 1,
       repository: { full_name: ORIGEN }, head_repository: { full_name: ORIGEN }
     },
-    jobs: JOBS_DEL_CANDIDATO.map(n => ({ name: n.endsWith(" ") ? `${n}v0.4.1` : n, conclusion: "success", run_attempt: 1 })),
+    jobs: JOBS_DEL_CANDIDATO.map(n => ({ name: n, conclusion: "success", run_attempt: 1 })),
     version,
     tagRef: ensayo ? null : { object: { type: "tag", sha: "e".repeat(40) } },
     tagAnotado: null,

@@ -83,7 +83,7 @@ export async function publicarPiloto({
   let borrador = releases.find(r => r.draft && r.tag_name === tag);
   if (borrador) {
     // Reanudar una carga a medias es seguro solo si es de ESTE candidato.
-    exigir(borrador.body?.includes(marcaEsperada), `Ya hay un borrador de ${tag} de otro candidato: revísalo y bórralo a mano.`);
+    exigir(mismaProcedencia(leerProcedencia(borrador.body), procedencia), `Ya hay un borrador de ${tag} de otro candidato: revísalo y bórralo a mano.`);
   } else {
     borrador = await api(`repos/${destino}/releases`, "POST", {
       tag_name: tag, target_commitish: repo.default_branch, draft: true, prerelease: true,

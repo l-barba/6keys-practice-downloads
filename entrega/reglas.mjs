@@ -12,15 +12,13 @@ export const MANIFIESTO = "release-manifest.json";
 // `candidato` ya lo exige allí, pero esta lista es la comprobación INDEPENDIENTE:
 // un PR a la rama de release que adelgazara `candidato.yml` (quitando una
 // plataforma o el ensayo de actualización) no pasaría por aquí. Si se renombra
-// un job allí, se cambia aquí en el mismo momento. Un nombre terminado en
-// espacio es un prefijo (hay un job por versión instalada desde la que se
-// actualiza).
+// un job allí, se cambia aquí en el mismo momento.
 export const JOBS_DEL_CANDIDATO = [
   "preparar",
   "macOS Apple Silicon (arm64)",
   "macOS Intel (x64)",
   "Windows (x64)",
-  "actualizar Windows desde ",
+  "actualizar Windows",
   "paquete",
   "candidato"
 ];
@@ -116,10 +114,17 @@ export function comprobarManifiesto(m, { version, tag, ensayo, sha }) {
  */
 const CLAVES_YML = new Set(["version", "files", "url", "sha512", "size", "path", "releaseDate", "blockMapSize"]);
 
+// Solo la fecha puede ir entre comillas (simples, como la escribe js-yaml). En
+// direcciones, huellas, tamaños y versión, una comilla es motivo de rechazo: no se
+// adivina cómo la interpretaría el actualizador.
+const CON_COMILLAS = new Set(["releaseDate"]);
+
 export function leerYml(texto) {
   const lineas = String(texto).split(/\r?\n/);
   const r = { files: [] };
+  const vistas = new Set();
   let actual = null;
+  let enFiles = false;
   for (let i = 0; i < lineas.length; i++) {
     const linea = lineas[i];
     if (/[#\t]/.test(linea)) throw new Error(`Manifiesto del actualizador con comentarios o tabuladores (línea ${i + 1}).`);
@@ -141,15 +146,18 @@ export function leerYml(texto) {
         throw new Error(`Valor de varias líneas en «${clave}»: no es lo que escribe electron-builder.`);
       }
     }
-    valor = valor.replace(/^'(.*)'$/, "$1").replace(/^"(.*)"$/, "$1");
+    if (CON_COMILLAS.has(clave) && /^'[^']*'$/.test(valor)) valor = valor.slice(1, -1);
+    if (/['"]/.test(valor)) throw new Error(`Comillas inesperadas en «${clave}» (línea ${i + 1}).`);
     if (guion) {
-      if (clave !== "url" || sangria !== "  ") throw new Error(`Entrada de «files» inesperada (línea ${i + 1}).`);
+      if (!enFiles || clave !== "url" || sangria !== "  ") throw new Error(`Entrada de «files» inesperada (línea ${i + 1}).`);
       actual = { url: valor };
       r.files.push(actual);
     } else if (sangria === "") {
       actual = null;
-      if (clave === "files") { if (valor) throw new Error("«files» tiene que ser una lista."); continue; }
-      if (r[clave] !== undefined) throw new Error(`Clave repetida: ${clave}`);
+      if (vistas.has(clave)) throw new Error(`Clave repetida: ${clave}`);
+      vistas.add(clave);
+      enFiles = clave === "files";
+      if (enFiles) { if (valor) throw new Error("«files» tiene que ser una lista."); continue; }
       r[clave] = valor;
     } else if (sangria === "    " && actual) {
       if (actual[clave] !== undefined) throw new Error(`Clave repetida en «files»: ${clave}`);
@@ -227,10 +235,15 @@ export async function sha512DeFichero(ruta) {
   return hash.digest("base64");
 }
 
-/** Misma procedencia, sin depender del orden de las claves. */
+/**
+ * ¿Es el mismo paquete? Compara lo que lo identifica —repo, run, commit, árbol,
+ * intento del job que lo preparó, artefacto y huellas— y no los datos de
+ * ejecución: repetir solo el último job del candidato cambia el intento del run,
+ * no el paquete.
+ */
+const IDENTIDAD = ["repositorio", "run_id", "rama", "sha", "arbol", "paquete_attempt", "artefacto_id", "artefacto_digest", "manifiesto_sha256"];
 export function mismaProcedencia(a, b) {
-  const canon = o => JSON.stringify(Object.keys(o ?? {}).sort().map(k => [k, o[k]]));
-  return Boolean(a && b) && canon(a) === canon(b);
+  return Boolean(a && b) && IDENTIDAD.every(k => a[k] !== undefined && a[k] === b[k]);
 }
 
 // Lo que se sabe de una release viaja en su cuerpo, en comentarios que GitHub no
