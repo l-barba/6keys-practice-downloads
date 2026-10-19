@@ -1,0 +1,29 @@
+# Las pruebas de `entrega/` en cada PR. Repo público: los minutos no cuentan.
+# `listo` es el check que exige la regla de la rama por defecto.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  listo:
+    name: listo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pruebas de la entrega
+        run: npm test

@@ -1,0 +1,136 @@
+# Publicar un candidato de 6Keys Practice como VERSIÓN EN PILOTO: una pre-release
+# que no es la «latest», así que ninguna instalación la recibe sola. La clínica
+# piloto la instala a mano. Lo lanza un agente o Luis; lo que publica pasa por la
+# aprobación de Luis (environment `piloto`), que llega al móvil.
+#
+#   gh workflow run piloto.yml -R l-barba/6keys-practice-downloads \
+#     -f version=X.Y.Z -f run_id=<run del candidato> -f modo=publicar
+#
+# Tres modos:
+#   · verificar — solo comprueba el candidato. Sin aprobación ni escritura.
+#   · ensayo    — para un candidato de ensayo (`candidato.yml` con nominar=false):
+#                 verifica, crea un borrador bajo `ensayo-<run>`, lo sube, lo
+#                 comprueba y lo BORRA. Pide la aprobación igual que publicar.
+#   · publicar  — para un candidato nominado (rama release/X.Y, tag vX.Y.Z): lo
+#                 publica como pre-release.
+#
+# El código que decide vive en este repo (`entrega/`), no en el privado: el
+# distribuidor aplica su propia política y trata lo que llega como datos.
+name: piloto
+run-name: >-
+  ${{ inputs.modo == 'publicar' && 'Piloto' || inputs.modo == 'ensayo' && 'Ensayo de publicación' || 'Verificación' }}
+  · 6Keys ${{ inputs.version }} · candidato ${{ inputs.run_id }}${{ inputs.urgencia != '' && format(' · URGENCIA: {0}', inputs.urgencia) || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión del candidato (X.Y.Z)"
+        required: true
+        type: string
+      run_id:
+        description: "Run de candidato.yml en 6keys-practice"
+        required: true
+        type: string
+      modo:
+        description: "verificar (sin escribir) · ensayo (borrador que se borra) · publicar"
+        type: choice
+        options: [verificar, ensayo, publicar]
+        default: verificar
+      urgencia:
+        description: "Solo si es urgente: el motivo. Permite publicar en viernes."
+        type: string
+        default: ""
+
+# Una operación de entrega a la vez, y en cola (no se descarta ninguna pendiente).
+# Lo comparte `promocion.yml`.
+concurrency:
+  group: entrega
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
+
+jobs:
+  # Con el secreto de lectura del repo privado, que vive en el environment
+  # `verificacion` (sin revisores; solo la rama por defecto de este repo).
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: verificacion
+    outputs:
+      tag: ${{ steps.verificar.outputs.tag }}
+      manifiesto_sha256: ${{ steps.verificar.outputs.manifiesto_sha256 }}
+      procedencia: ${{ steps.verificar.outputs.procedencia }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verificar el candidato en el repo privado
+        id: verificar
+        env:
+          GH_TOKEN: ${{ secrets.LECTURA_6KEYS }}
+          VERSION: ${{ inputs.version }}
+          RUN_ID: ${{ inputs.run_id }}
+          ENSAYO: ${{ inputs.modo == 'ensayo' }}
+          SALIDA: ${{ runner.temp }}/verificado
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Falta el secreto LECTURA_6KEYS en el environment «verificacion» (docs/15 del repo privado)."
+            exit 1
+          fi
+          node entrega/verificar.mjs
+
+      - name: Pasar el paquete verificado al job que publica
+        if: inputs.modo != 'verificar'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verificado
+          path: ${{ runner.temp }}/verificado/paquete/
+          retention-days: 3
+          if-no-files-found: error
+
+  # Detrás de la aprobación de Luis. Escribe con el GITHUB_TOKEN de este repo: no
+  # hay ningún token de publicación que guardar ni que renovar.
+  publicar:
+    needs: verificar
+    if: inputs.modo != 'verificar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: piloto
+      url: ${{ steps.publicar.outputs.url }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: verificado
+          path: ${{ runner.temp }}/paquete
+
+      - name: ${{ inputs.modo == 'ensayo' && 'Ensayar la publicación (borrador que se borra)' || 'Publicar como versión en piloto' }}
+        id: publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ needs.verificar.outputs.tag }}
+          MANIFIESTO_SHA256: ${{ needs.verificar.outputs.manifiesto_sha256 }}
+          PROCEDENCIA: ${{ needs.verificar.outputs.procedencia }}
+          CARPETA: ${{ runner.temp }}/paquete
+          ENSAYO: ${{ inputs.modo == 'ensayo' }}
+          URGENCIA: ${{ inputs.urgencia }}
+        run: node entrega/publicar.mjs

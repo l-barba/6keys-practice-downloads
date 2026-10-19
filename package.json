@@ -1,0 +1,10 @@
+{
+  "name": "6keys-practice-downloads",
+  "private": true,
+  "type": "module",
+  "description": "Verificación, publicación y promoción de las versiones de 6Keys Practice.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  }
+}

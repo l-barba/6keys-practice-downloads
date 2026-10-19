@@ -1,0 +1,87 @@
+# Promocionar la versión en piloto a TODAS las clínicas: la misma release y los
+# mismos ficheros pasan a ser la «latest», que es lo que consulta el actualizador.
+# Nada se reconstruye ni se vuelve a subir.
+#
+#   gh workflow run promocion.yml -R l-barba/6keys-practice-downloads \
+#     -f version=X.Y.Z -f inicio_piloto=AAAA-MM-DD
+#
+# Primero `revisar` (sin escribir nada; con `seco` se queda ahí) y después
+# `promocionar`, detrás de la aprobación de Luis (environment `clinicas`), que lo
+# vuelve a comprobar todo al ejecutarse: la aprobación puede llegar días después.
+# Aprobar es confirmar lo que dice el nombre del run.
+name: promocion
+run-name: >-
+  Promoción · 6Keys ${{ inputs.version }} a todas las clínicas · piloto desde ${{ inputs.inicio_piloto }}
+  · al aprobar confirmas: copias verificadas, restauración de prueba y puestos funcionando${{ inputs.urgencia != '' && format(' · URGENCIA: {0}', inputs.urgencia) || '' }}${{ inputs.seco && ' · EN SECO' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión en piloto (X.Y.Z)"
+        required: true
+        type: string
+      inicio_piloto:
+        description: "Día en que la clínica piloto la instaló (AAAA-MM-DD). El plazo de 7 días cuenta desde aquí."
+        required: true
+        type: string
+      urgencia:
+        description: "Solo si es urgente: el motivo. Acorta el piloto y permite el viernes."
+        type: string
+        default: ""
+      seco:
+        description: "Solo revisar, sin pedir aprobación ni cambiar nada"
+        type: boolean
+        default: false
+
+concurrency:
+  group: entrega
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Revisar sin cambiar nada
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          INICIO_PILOTO: ${{ inputs.inicio_piloto }}
+          URGENCIA: ${{ inputs.urgencia }}
+        run: node entrega/promocionar.mjs
+
+  promocionar:
+    needs: revisar
+    if: ${{ !inputs.seco }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: clinicas
+      url: https://github.com/${{ github.repository }}/releases/tag/v${{ inputs.version }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Promocionar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          INICIO_PILOTO: ${{ inputs.inicio_piloto }}
+          URGENCIA: ${{ inputs.urgencia }}
+        run: node entrega/promocionar.mjs --promocionar
